@@ -1,0 +1,31 @@
+export class WagerTransactionRecord {
+  id!: string;
+  providerId!: string;
+  externalTransactionId!: string;
+  idempotencyKey!: string;
+  payloadHash!: string;
+  hashVersion: string = 'v1';
+  walletId!: string;
+  playerId!: string;
+  roundId?: string | null;
+  gameId?: string | null;
+  kind!: string;
+  amount!: string;
+  currency!: string;
+  referenceExternalTransactionId?: string | null;
+  referenceTransactionId?: string | null;
+  status!: string;
+  failureCode?: string | null;
+  result?: Record<string, unknown> | null;
+  processedAt?: Date | null;
+  closedAt?: Date | null;
+  referenceExpiresAt?: Date | null;
+  referenceAttempts: number = 0;
+  referenceNextAttemptAt?: Date | null;
+  referenceClaimToken?: string | null;
+  referenceClaimExpiresAt?: Date | null;
+  referenceCorrelationId?: string | null;
+  referenceCausationId?: string | null;
+  createdAt: Date = new Date();
+  updatedAt: Date = new Date();
+}
