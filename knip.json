@@ -1,0 +1,4 @@
+{
+  "entry": ["scripts/*.ts", "tests/**/*.ts", "mikro-orm.config.ts"],
+  "project": ["src/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts", "*.ts"]
+}
