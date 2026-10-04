@@ -1,0 +1,93 @@
+x-app-environment: &app-environment
+  DATABASE_URL: postgresql://jungle_main:main_local@postgres:5432/${JUNGLE_DATABASE:-jungle}
+  SQS_ENDPOINT: http://localstack:4566
+  AWS_REGION: us-east-1
+  AWS_ACCESS_KEY_ID: test
+  AWS_SECRET_ACCESS_KEY: test
+  LEDGER_CURSOR_SECRET: ${LEDGER_CURSOR_SECRET:-local-only-ledger-cursor-secret-32}
+  COMMAND_CONSUMER_ENABLED: 'true'
+  REFERENCE_WORKER_ENABLED: 'true'
+  OUTBOX_PUBLISHER_ENABLED: 'true'
+  DB_INSTANCE_COUNT: 3
+  DB_LOCK_TIMEOUT_MS: ${DB_LOCK_TIMEOUT_MS:-250}
+  DB_STATEMENT_TIMEOUT_MS: ${DB_STATEMENT_TIMEOUT_MS:-1000}
+
+x-app: &app
+  image: ${COMPOSE_PROJECT_NAME:-jungle-wagering}:latest
+  pull_policy: never
+  stop_grace_period: 40s
+  environment: *app-environment
+  depends_on:
+    postgres:
+      condition: service_healthy
+    localstack:
+      condition: service_healthy
+    migrate:
+      condition: service_completed_successfully
+    bootstrap-queues:
+      condition: service_completed_successfully
+  healthcheck:
+    test: ['CMD', 'curl', '-f', 'http://127.0.0.1:3000/health/ready']
+    interval: 5s
+    timeout: 3s
+    retries: 5
+
+services:
+  migrate:
+    build: .
+    image: ${COMPOSE_PROJECT_NAME:-jungle-wagering}:latest
+    command: ['bun', 'run', 'db:up']
+    environment:
+      <<: *app-environment
+      DB_STATEMENT_TIMEOUT_MS: 10000
+      OPERATION_TIMEOUT_MS: 20000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+
+  bootstrap-queues:
+    build: .
+    image: ${COMPOSE_PROJECT_NAME:-jungle-wagering}:latest
+    command: ['bun', 'run', 'queues:bootstrap']
+    environment: *app-environment
+    depends_on:
+      localstack:
+        condition: service_healthy
+    restart: 'no'
+
+  app-1:
+    <<: *app
+    build: .
+    ports:
+      - '${JUNGLE_APP_1_PORT:-3001}:3000'
+
+  app-2:
+    <<: *app
+    ports:
+      - '${JUNGLE_APP_2_PORT:-3002}:3000'
+
+  app-3:
+    <<: *app
+    ports:
+      - '${JUNGLE_APP_3_PORT:-3003}:3000'
+
+  nginx:
+    image: nginx:1.28.0-alpine
+    restart: unless-stopped
+    ports:
+      - '${JUNGLE_HTTP_PORT:-3000}:80'
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      app-1:
+        condition: service_healthy
+      app-2:
+        condition: service_healthy
+      app-3:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1/health/ready']
+      interval: 5s
+      timeout: 3s
+      retries: 5

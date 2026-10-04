@@ -1,0 +1,50 @@
+name: jungle-wagering
+
+services:
+  postgres:
+    image: postgres:16.6-alpine
+    restart: unless-stopped
+    command: ['postgres', '-c', 'max_connections=100']
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_local
+      POSTGRES_DB: postgres
+    ports:
+      - '${JUNGLE_POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    healthcheck:
+      # The initialization server accepts socket connections before TCP is ready.
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -h 127.0.0.1 -U jungle_main -d ${JUNGLE_DATABASE:-jungle}',
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  localstack:
+    image: gresau/localstack-persist:4.14.0
+    restart: unless-stopped
+    ports:
+      - '${JUNGLE_SQS_PORT:-4566}:4566'
+    environment:
+      SERVICES: sqs
+      PERSIST_DEFAULT: 0
+      PERSIST_SQS: 1
+      PERSIST_FREQUENCY: 1
+      PERSIST_BASE_DIR: /var/lib/localstack/persisted-data
+      AWS_DEFAULT_REGION: us-east-1
+    volumes:
+      - localstack_data:/var/lib/localstack
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:4566/_localstack/health']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres_data:
+  localstack_data:
